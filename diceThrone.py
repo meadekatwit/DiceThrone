@@ -1,5 +1,8 @@
 import random
 
+debug = True
+gameOutput = True
+
 class Hero:
     """
     The "Player" class, holding all relevant information to a player.
@@ -536,6 +539,11 @@ class Dice:
         else:
             self.side = "NULL"
 
+    def toggle(self):
+        global debug
+        if debug: print(" === [Dice Object]: dice {}locked.".format("un" * self.locked))
+        self.locked = not self.locked
+
     def __str__(self):
         if self.locked:
             return "<{} - {}>".format(self.value, self.side)
@@ -700,4 +708,123 @@ def consoleGame():
         turncount += 1
         currentPlayer = players[turncount % len(players)]
 
-consoleGame()
+# =========== GUI
+
+#Create moon elf
+moonDice = []
+for i in range(5):
+    moonDice.append(Dice(["Arrow", "Arrow", "Arrow", "Foot", "Foot", "Moon"]))
+#Add Moon Elf abilities
+longbow3 = Ability("Longbow 3", ["Arrow", "Arrow", "Arrow"], [Damage(4)])
+longbow4 = Ability("Longbow 4", ["Arrow", "Arrow", "Arrow", "Arrow"], [Damage(5)])
+longbow5 = Ability("Longbow 5", ["Arrow", "Arrow", "Arrow", "Arrow", "Arrow"], [Damage(7)])
+demisingShot = Ability("Demising Shot", ["Arrow", "Arrow", "Arrow", "Moon", "Moon"], [Inflict(Targeted()), Damage(4)])
+coveredShot = Ability("Covered Shot", ["Arrow", "Arrow", "Foot", "Foot", "Foot"], [Inflict(Evasive()), Damage(7)])
+explodingArrow = Ability("Exploding Arrow", ["Arrow", "Moon", "Moon", "Moon"], [RollEffect_MoonElf()])
+entanglingShot = Ability("Entangling Shot", 4, actions = [Inflict(Entangle()), Damage(7)])
+eclipse = Ability("Eclipse", ["Moon", "Moon", "Moon", "Moon"], [Inflict(Blind()), Inflict(Entangle()), Inflict(Targeted()), Damage(7)])
+blindingShot = Ability("Blinding Shot", 5, actions = [Inflict(Blind()), Inflict(Evasive()), Damage(8)]) 
+missedMe = Ability("Missed Me", 0,  [MissedMe_MoonElf()], defense = True)
+lunarEclipse = Ability("Lunar Eclipse", ["Moon", "Moon", "Moon", "Moon", "Moon"], [Inflict(Evasive()), Inflict(Blind()), Inflict(Entangle()), Inflict(Targeted()), UndefendableDamage(12)], ultimate = True)
+
+moonAbilities = [longbow3, longbow4, longbow5, demisingShot, coveredShot, explodingArrow, \
+                entanglingShot, eclipse, blindingShot, missedMe, lunarEclipse]
+moonElf = Hero(name = "Moon Elf", dice = moonDice, abilities = moonAbilities, conditions = [])
+
+from tkinter import *
+
+thisPlayer = moonElf
+otherPlayer = moonElf
+
+# Create the main window
+root = Tk()
+root.title("Dice Throne")
+
+f_player = Frame(root)
+f_player.pack(side = LEFT)
+
+f_header = Frame(f_player, width=300, height=100, highlightbackground="black", highlightthickness=1)
+f_header.pack(side = TOP,fill = BOTH)
+l_name = Label(f_header, text = thisPlayer.name, highlightbackground = "black", highlightthickness = 1)
+l_name.pack(side = LEFT, fill = BOTH)
+l_health = Label(f_header, text = "HP: {}".format(thisPlayer.health), highlightbackground = "black", highlightthickness = 1)
+l_health.pack(side = RIGHT, fill = BOTH)
+l_combatPoints = Label(f_header, text = "CP: {}".format(thisPlayer.cp), highlightbackground = "black", highlightthickness = 1)
+l_combatPoints.pack(side = RIGHT, fill = BOTH)
+
+f_display = Frame(f_player, width=300, height=200, highlightbackground="black", highlightthickness=1)
+f_display.pack(side = TOP)
+f_display_L = Frame(f_display, width=150, height=200, highlightbackground="black", highlightthickness=1)
+f_display_L.pack(side = LEFT)
+f_display_R = Frame(f_display, width=150, height=200, highlightbackground="black", highlightthickness=1)
+f_display_R.pack(side = RIGHT)
+
+f_dice = Frame(f_player, width=300, height=50, highlightbackground="black", highlightthickness=1)
+f_dice.pack(side = TOP)
+
+f_conditions = Frame(f_player, width=300, height=50, highlightbackground="black", highlightthickness=1)
+f_conditions.pack(side = TOP)
+
+f_selections = Frame(f_player, width=300, height=50, highlightbackground="black", highlightthickness=1)
+f_selections.pack(side = TOP)
+
+def rollDice():
+    for dice in thisPlayer.dice:
+        dice.roll()
+
+b_roll = Button(f_selections, text = "Roll", command=lambda: [rollDice(), updateDice(images, thisPlayer)])
+b_roll.pack(side = RIGHT)
+
+#Add dice images
+
+images = []
+imageButtons = []
+for i in range(5):
+    img = PhotoImage(file = "defaultDice/d0.png")
+    images.append(img)
+    imageButtons.append(Button(f_dice, image = img, command=lambda i=i: [thisPlayer.dice[i].toggle(), updateDice(images, thisPlayer)]))
+
+def updateDice(images, thisPlayer, enabled = 5):
+    try:
+        i = 0
+        for image in images:
+            image.config(file = "{}/d{}.png".format(thisPlayer.name, thisPlayer.dice[i].value))
+            i += 1
+    except:
+        i = 0
+        for image in images:
+            image.config(file = "{}/d{}.png".format("defaultDice", thisPlayer.dice[i].value))
+            i += 1
+
+    i = 0
+    for image in imageButtons:
+        if thisPlayer.dice[i].locked:
+            image.config(bg="blue")
+        else:
+            image.config(bg="black")
+        if i < enabled:
+            image.config(state = "normal")
+        else:
+            image.config(state = "disabled")
+
+        i += 1
+
+updateDice(images, thisPlayer)
+
+#Add Ability Images
+abilityButtons = []
+i = 0
+for ability in thisPlayer.abilities:
+    dsp = f_display_L
+    if i > len(thisPlayer.abilities) / 2:
+        dsp = f_display_R
+    btn = Button(dsp, text = ability.name, state = "disabled", command = lambda i=i: [thisPlayer.abilities[i].use(otherPlayer)])
+    btn.pack(side = TOP)
+    abilityButtons.append(btn)
+    i += 1
+        
+for label in imageButtons:
+    label.pack(side=LEFT, fill = BOTH)
+
+# Run the Tkinter event loop
+root.mainloop()
